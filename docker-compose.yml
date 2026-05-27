@@ -1,0 +1,36 @@
+services:
+  bitrix-mcp:
+    build: .
+    image: bitrix-mcp-server:latest
+    container_name: bitrix-mcp
+    restart: unless-stopped
+    environment:
+      # REQUIRED — generate with: openssl rand -base64 32
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      # REQUIRED — your public domain (no trailing slash)
+      BASE_URL: ${BASE_URL:-https://bitrix-mcp.example.com}
+      PORT: "3000"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      NODE_ENV: production
+    expose:
+      - "3000"
+    networks:
+      - traefik-public
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.bitrix-mcp.rule=Host(`${DOMAIN:-bitrix-mcp.example.com}`)
+      - traefik.http.routers.bitrix-mcp.entrypoints=websecure
+      - traefik.http.routers.bitrix-mcp.tls.certresolver=letsencrypt
+      - traefik.http.services.bitrix-mcp.loadbalancer.server.port=3000
+      # Security headers via Traefik
+      - traefik.http.middlewares.bitrix-mcp-headers.headers.stsSeconds=63072000
+      - traefik.http.middlewares.bitrix-mcp-headers.headers.stsIncludeSubdomains=true
+      - traefik.http.routers.bitrix-mcp.middlewares=bitrix-mcp-headers
+
+networks:
+  traefik-public:
+    external: true
+
+# Without Traefik (direct port exposure for testing):
+#    ports:
+#      - "3000:3000"
