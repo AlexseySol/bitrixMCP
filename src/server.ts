@@ -110,10 +110,12 @@ const mcpHandler = async (req: Request, res: Response): Promise<void> => {
     return;
   }
 
-  // Fresh server + transport per request — fully stateless multi-tenant
+  // Fresh server + transport per request — fully stateless multi-tenant.
+  // sessionIdGenerator: undefined means no mcp-session-id header is ever sent.
+  // Claude won't try to reuse a session ID, so every POST is handled independently.
   const mcpServer = createMcpServer(ctx);
   const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: () => Math.random().toString(36).slice(2),
+    sessionIdGenerator: undefined,
     enableJsonResponse: true,
   });
 
