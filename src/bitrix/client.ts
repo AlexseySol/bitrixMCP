@@ -68,8 +68,15 @@ export class BitrixClient {
   // ---- Users ----
 
   async getCurrentUser(): Promise<User> {
-    const raw = await this.call<BitrixRawUser>("user.current");
-    return normalizeUser(raw);
+    // `profile` works with any webhook scope; `user.current` needs the `user` scope.
+    // Try user.current first for full data (email), fall back to profile.
+    try {
+      const raw = await this.call<BitrixRawUser>("user.current");
+      return normalizeUser(raw);
+    } catch {
+      const raw = await this.call<BitrixRawUser>("profile");
+      return normalizeUser(raw);
+    }
   }
 
   async searchUsers(query: string, limit: number): Promise<User[]> {
