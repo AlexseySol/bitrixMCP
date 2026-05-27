@@ -1,14 +1,20 @@
 import { fetch } from "undici";
 
-// Valid Bitrix24 webhook URL pattern
-const WEBHOOK_REGEX =
-  /^https:\/\/[a-z0-9][a-z0-9-]*\.bitrix24\.(com|ru|ua|by|de|fr|es|pl|it|br|eu|in|cn|jp|mx|net|org)\/rest\/\d+\/[a-z0-9]+\/?$/i;
+// Accepts both cloud Bitrix24 (*.bitrix24.*) and self-hosted instances on any HTTPS domain.
+// Pattern: https://<any-domain>/rest/<userId>/<token>/
+const WEBHOOK_REGEX = /^https:\/\/[a-z0-9][a-z0-9.-]*\.[a-z]{2,}\/rest\/\d+\/[a-z0-9_-]+\/?$/i;
 
 export function parseWebhookUrl(url: string): { domain: string } | null {
-  const trimmed = url.trim().replace(/\/?$/, "/"); // ensure trailing slash
+  const trimmed = url.trim().replace(/\/?$/, "/");
   if (!WEBHOOK_REGEX.test(trimmed)) return null;
-  const parsed = new URL(trimmed);
-  return { domain: parsed.hostname };
+  try {
+    const parsed = new URL(trimmed);
+    // Extra safety: block non-https, IP-only addresses without port (private ranges handled by firewall)
+    if (parsed.protocol !== "https:") return null;
+    return { domain: parsed.hostname };
+  } catch {
+    return null;
+  }
 }
 
 export interface BitrixCurrentUser {

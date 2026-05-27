@@ -239,7 +239,8 @@ function renderAuthPage(params: {
         value="${escapeHtml(params.webhookValue ?? "")}"
       >
       <div class="hint">
-        Формат: <code>https://домен.bitrix24.ru/rest/USER_ID/TOKEN/</code>
+        Облако: <code>https://домен.bitrix24.ru/rest/USER_ID/TOKEN/</code><br>
+        Self-hosted: <code>https://ваш-домен.com/rest/USER_ID/TOKEN/</code>
       </div>
 
       <div class="steps">
