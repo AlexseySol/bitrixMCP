@@ -151,11 +151,11 @@ export class BitrixClient {
     const filterQs = filterToQueryString(filter);
     const selectQs = TASK_FIELDS.map((f) => `select[]=${f}`).join("&");
 
+    // Only responsible + creator — "my tasks" in the personal sense.
+    // Accomplice/auditor cover company-wide tasks (thousands) that belong to others.
     const cmds: Record<string, string> = {
       r: `tasks.task.list?filter[RESPONSIBLE_ID]=${userId}&${filterQs}&${selectQs}&start=${start}`,
       c: `tasks.task.list?filter[CREATED_BY]=${userId}&${filterQs}&${selectQs}&start=${start}`,
-      a: `tasks.task.list?filter[ACCOMPLICES][0]=${userId}&${filterQs}&${selectQs}&start=${start}`,
-      u: `tasks.task.list?filter[AUDITORS][0]=${userId}&${filterQs}&${selectQs}&start=${start}`,
     };
 
     const batchResult = await this.batchCall(cmds);
@@ -163,9 +163,8 @@ export class BitrixClient {
     const seen = new Set<string>();
     const merged: Task[] = [];
 
-    for (const key of ["r", "c", "a", "u"]) {
+    for (const key of ["r", "c"]) {
       const entry = batchResult[key];
-      // Batch result per-command is the raw result object (no extra `result` wrapper)
       const tasks = ((entry as unknown as { tasks?: BitrixRawTask[] })?.tasks ?? []) as BitrixRawTask[];
       for (const t of tasks) {
         if (!seen.has(t.id)) {

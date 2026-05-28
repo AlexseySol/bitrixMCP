@@ -23,7 +23,7 @@ export function registerTasksList(server: McpServer, client: BitrixClient, ctx: 
         role: z
           .enum(["responsible", "creator", "accomplice", "auditor", "any"])
           .optional()
-          .describe("Your role in the task (default: any)"),
+          .describe("Your role: 'any' = responsible+creator (your personal tasks). Use 'accomplice' or 'auditor' for company-wide tasks."),
         status: z
           .array(z.enum(statusValues))
           .optional()
