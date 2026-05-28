@@ -1,75 +1,80 @@
-# Bitrix24 Task Manager — інструкції для Claude
+---
+name: Bitrix24 Task Manager
+description: Manage Bitrix24 tasks via MCP — list, create, update, complete, delegate tasks and work with comments.
+version: 1.0.0
+author: Ribas Hotels Group
+---
 
-Ти підключений до Bitrix24 через MCP. Використовуй інструменти нижче для роботи з задачами.
+# Bitrix24 Task Manager
 
-## Доступні інструменти
+You are connected to Bitrix24 via MCP. Use the tools below to manage tasks on behalf of the authenticated user.
 
-### Перегляд задач
-- `bitrix_whoami` — хто підключений (ім'я, email, домен)
-- `bitrix_tasks_list` — список задач з фільтрами
-- `bitrix_tasks_get` — деталі конкретної задачі за ID
-- `bitrix_tasks_overdue` — прострочені задачі (дедлайн минув, не завершені)
-- `bitrix_tasks_counters` — статистика: прострочені, нові коментарі, згадки
+## Available tools
 
-### Управління задачами
-- `bitrix_tasks_create` — створити нову задачу
-- `bitrix_tasks_update` — змінити поля задачі (назва, опис, дедлайн, пріоритет)
-- `bitrix_tasks_start` — почати задачу (статус → "в роботі")
-- `bitrix_tasks_pause` — поставити на паузу
-- `bitrix_tasks_complete` — завершити задачу
-- `bitrix_tasks_defer` — відкласти задачу
-- `bitrix_tasks_renew` — відновити завершену задачу
-- `bitrix_tasks_delegate` — делегувати іншому користувачу
+### View tasks
+- `bitrix_whoami` — who is connected (name, email, domain)
+- `bitrix_tasks_list` — list tasks with optional filters
+- `bitrix_tasks_get` — full details of a task by ID
+- `bitrix_tasks_overdue` — tasks with past deadline that are not completed
+- `bitrix_tasks_counters` — dashboard: overdue count, new comments, mentions
 
-### Коментарі та користувачі
-- `bitrix_tasks_comments` — переглянути або додати коментар до задачі
-- `bitrix_users_search` — знайти користувача за ім'ям або email
-- `bitrix_users_list` — список всіх користувачів
+### Manage tasks
+- `bitrix_tasks_create` — create a new task
+- `bitrix_tasks_update` — update task fields (title, description, deadline, priority, responsible)
+- `bitrix_tasks_start` — move task to "in progress"
+- `bitrix_tasks_pause` — pause an in-progress task
+- `bitrix_tasks_complete` — mark task as completed
+- `bitrix_tasks_defer` — defer (postpone) a task
+- `bitrix_tasks_renew` — reopen a completed task
+- `bitrix_tasks_delegate` — reassign task to another user
 
-## Ролі в задачах
-- `responsible` — відповідальний (виконавець)
-- `creator` — постановник (хто створив)
-- `accomplice` — соисполнитель (допомагає)
-- `auditor` — спостерігач
-- `any` — всі ролі разом (за замовчуванням)
+### Comments and users
+- `bitrix_tasks_comments` — list comments or add a comment to a task
+- `bitrix_users_search` — find user by name or email
+- `bitrix_users_list` — list all active users
 
-## Статуси задач
-- `new` — нова
-- `pending` — очікує виконання
-- `in_progress` — в роботі
-- `supposedly_completed` — на перевірці
-- `completed` — завершена
-- `deferred` — відкладена
-- `declined` — відхилена
+## Roles
+- `responsible` — assignee (executes the task)
+- `creator` — who created/assigned the task
+- `accomplice` — co-executor (helps)
+- `auditor` — observer
+- `any` — all roles combined (default for most tools)
 
-## Пріоритети
-- `low` — низький
-- `normal` — нормальний (за замовчуванням)
-- `high` — високий
+## Task statuses
+- `new` — new
+- `pending` — waiting to start
+- `in_progress` — in progress
+- `supposedly_completed` — awaiting review
+- `completed` — done
+- `deferred` — postponed
+- `declined` — declined
 
-## Типові запити
+## Priority values
+- `low`, `normal` (default), `high`
 
-**"Які мої задачі?"**
-→ `bitrix_tasks_list` без параметрів
+## Behavior guidelines
 
-**"Прострочені задачі"**
-→ `bitrix_tasks_overdue`
+**Always call `bitrix_whoami` first** if the user asks who they are or what account is connected.
 
-**"Задачі на цьому тижні"**
-→ `bitrix_tasks_list` з `deadline_to: "<кінець тижня>"`
+**For "show my tasks"** → call `bitrix_tasks_list` with no filters (returns responsible + creator + accomplice + auditor tasks).
 
-**"Задачі де я відповідальний, статус 'в роботі'"**
-→ `bitrix_tasks_list` з `role: "responsible"`, `status: ["in_progress"]`
+**For "overdue tasks"** → call `bitrix_tasks_overdue` (finds tasks with deadline in the past that are not completed).
 
-**"Створи задачу X для Y до Z"**
-→ `bitrix_users_search` щоб знайти ID користувача Y
-→ `bitrix_tasks_create` з відповідними полями
+**For "tasks this week"** → call `bitrix_tasks_list` with `deadline_to` set to end of week in ISO format.
 
-**"Завершити задачу 12345"**
-→ `bitrix_tasks_complete` з `task_id: 12345`
+**For "create task X for person Y by date Z"**:
+1. Call `bitrix_users_search` to find person Y's user ID
+2. Call `bitrix_tasks_create` with `title`, `responsible_id`, `deadline`
 
-## Важливо
-- Всі дати передавай у форматі ISO 8601: `2026-05-28T18:00:00`
-- ID задач — цілі числа
-- При делегуванні спочатку знайди ID користувача через `bitrix_users_search`
-- Якщо потрібно знайти задачу за назвою — використовуй `bitrix_tasks_list` з параметром `search`
+**For "complete / start / defer task"** → always use the dedicated action tool (`bitrix_tasks_complete`, `bitrix_tasks_start`, `bitrix_tasks_defer`) rather than `bitrix_tasks_update`.
+
+**For delegating** → find the new assignee ID via `bitrix_users_search`, then call `bitrix_tasks_delegate`.
+
+## Date format
+All dates must be ISO 8601: `2026-05-28T18:00:00` or `2026-05-28`.
+
+## Important notes
+- Task IDs are integers
+- When searching for a task by title use `bitrix_tasks_list` with the `search` parameter
+- After creating or updating a task, confirm the result to the user with the task ID and title
+- Respond to the user in the same language they write in
