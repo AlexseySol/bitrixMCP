@@ -126,7 +126,7 @@ export class BitrixClient {
     const order = buildOrder(params.orderBy, params.orderDir);
 
     if (!params.role || params.role === "any") {
-      return this.listTasksAllRoles(params.userId, filter, order, start, perPage, page);
+      return this.listTasksAllRoles(params.userId, filter, order, perPage, page);
     }
 
     const roleFilter = roleToFilter(params.role, params.userId);
@@ -144,19 +144,19 @@ export class BitrixClient {
     userId: number,
     filter: Record<string, unknown>,
     order: Record<string, string>,
-    start: number,
     limit: number,
     page: number,
   ): Promise<TaskListResult> {
     const filterQs = filterToQueryString(filter);
     const selectQs = TASK_FIELDS.map((f) => `select[]=${f}`).join("&");
 
-    // ACCOMPLICE / AUDITOR singular — plural form is ignored by Bitrix24 API
+    // Always start=0 — pagination is done in-memory after merging all roles.
+    // ACCOMPLICE/AUDITOR must be singular per Bitrix24 docs.
     const cmds: Record<string, string> = {
-      r: `tasks.task.list?filter[RESPONSIBLE_ID]=${userId}&${filterQs}&${selectQs}&start=${start}`,
-      c: `tasks.task.list?filter[CREATED_BY]=${userId}&${filterQs}&${selectQs}&start=${start}`,
-      a: `tasks.task.list?filter[ACCOMPLICE]=${userId}&${filterQs}&${selectQs}&start=${start}`,
-      u: `tasks.task.list?filter[AUDITOR]=${userId}&${filterQs}&${selectQs}&start=${start}`,
+      r: `tasks.task.list?filter[RESPONSIBLE_ID]=${userId}&${filterQs}&${selectQs}&start=0`,
+      c: `tasks.task.list?filter[CREATED_BY]=${userId}&${filterQs}&${selectQs}&start=0`,
+      a: `tasks.task.list?filter[ACCOMPLICE]=${userId}&${filterQs}&${selectQs}&start=0`,
+      u: `tasks.task.list?filter[AUDITOR]=${userId}&${filterQs}&${selectQs}&start=0`,
     };
 
     const batchResult = await this.batchCall(cmds);
@@ -176,7 +176,13 @@ export class BitrixClient {
     }
 
     const sorted = sortTasks(merged, order);
-    return { tasks: sorted.slice(0, limit), total: sorted.length, page, per_page: limit };
+    const offset = (page - 1) * limit;
+    return {
+      tasks: sorted.slice(offset, offset + limit),
+      total: sorted.length,
+      page,
+      per_page: limit,
+    };
   }
 
   async getTask(taskId: number, userId: number): Promise<Task> {
