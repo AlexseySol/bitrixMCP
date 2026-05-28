@@ -238,6 +238,38 @@ export class BitrixClient {
     });
   }
 
+  // ---- Overdue tasks ----
+  // Uses JSON body (not batch query string) because <=DEADLINE key contains '=' which
+  // breaks URL parsers when used as a query string parameter name.
+  async listOverdueTasks(userId: number, roleFilter?: string, limit = 20): Promise<Task[]> {
+    const deadlineTo = new Date().toISOString();
+    const roles =
+      roleFilter && roleFilter !== "any"
+        ? [roleFilter]
+        : ["responsible", "creator", "accomplice"];
+
+    const seen = new Set<string>();
+    const merged: Task[] = [];
+
+    for (const role of roles) {
+      const rf = roleToFilter(role, userId);
+      const raw = await this.call<{ tasks: BitrixRawTask[] }>("tasks.task.list", {
+        filter: { ...rf, "<=DEADLINE": deadlineTo, "!STATUS": 5 },
+        select: TASK_FIELDS,
+        order: { DEADLINE: "ASC" },
+        start: 0,
+      });
+      for (const t of raw.tasks ?? []) {
+        if (!seen.has(t.id)) {
+          seen.add(t.id);
+          merged.push(normalizeTask(t, userId));
+        }
+      }
+    }
+
+    return merged.slice(0, limit);
+  }
+
   // ---- Counters ----
 
   async getCounters(): Promise<{ expired: number; new_comments: number; mentioned: number }> {

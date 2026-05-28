@@ -59,16 +59,15 @@ export function registerTasksCounters(
     },
     async ({ role, limit }) => {
       try {
-        const result = await client.listTasks({
-          userId: ctx.bitrixUserId,
-          role: role ?? "any",
-          overdueOnly: true,
-          orderBy: "deadline",
-          orderDir: "asc",
-          page: 1,
-          perPage: limit ?? 20,
-        });
-        return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+        const tasks = await client.listOverdueTasks(ctx.bitrixUserId, role, limit ?? 20);
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify({ tasks, total: tasks.length }),
+            },
+          ],
+        };
       } catch (err) {
         return {
           isError: true,
