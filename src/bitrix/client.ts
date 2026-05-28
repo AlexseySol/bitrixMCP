@@ -239,12 +239,17 @@ export class BitrixClient {
 
   // ---- Counters ----
 
-  async getCounters(userId: number): Promise<Record<string, number>> {
-    const raw = await this.call<Record<string, Record<string, number>>>(
-      "tasks.task.counters.get",
-      {},
-    );
-    return raw[String(userId)] ?? {};
+  async getCounters(): Promise<{ expired: number; new_comments: number; mentioned: number }> {
+    const raw = await this.call<{
+      expired?: { counter: number };
+      new_comments?: { counter: number };
+      mentioned?: { counter: number };
+    }>("tasks.task.counters.get", {});
+    return {
+      expired: raw.expired?.counter ?? 0,
+      new_comments: raw.new_comments?.counter ?? 0,
+      mentioned: raw.mentioned?.counter ?? 0,
+    };
   }
 }
 

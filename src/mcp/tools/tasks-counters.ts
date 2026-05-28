@@ -12,33 +12,19 @@ export function registerTasksCounters(
     "bitrix_tasks_counters",
     {
       description:
-        "Get a task dashboard for the current user: counts of new, in-progress, and overdue tasks grouped by your role.",
+        "Get a task dashboard for the current user: counts of overdue tasks, tasks with new comments, and tasks where you are mentioned.",
     },
     async () => {
       try {
-        const raw = await client.getCounters(ctx.bitrixUserId);
+        const counters = await client.getCounters();
         return {
           content: [
             {
               type: "text" as const,
               text: JSON.stringify({
-                as_responsible: {
-                  new: raw["RESPONSIBLE_NEW"] ?? 0,
-                  in_progress: raw["RESPONSIBLE_TOTAL"] ?? 0,
-                  overdue: raw["RESPONSIBLE_OVERDUED"] ?? 0,
-                  new_comments: raw["RESPONSIBLE_NEW_COMMENTS"] ?? 0,
-                },
-                as_creator: {
-                  in_progress: raw["ORIGINATOR_TOTAL"] ?? 0,
-                  overdue: raw["ORIGINATOR_OVERDUED"] ?? 0,
-                },
-                as_accomplice: {
-                  in_progress: raw["ACCOMPLICE_TOTAL"] ?? 0,
-                  overdue: raw["ACCOMPLICE_OVERDUED"] ?? 0,
-                },
-                as_auditor: {
-                  in_progress: raw["AUDITOR_TOTAL"] ?? 0,
-                },
+                expired: counters.expired,
+                new_comments: counters.new_comments,
+                mentioned: counters.mentioned,
               }),
             },
           ],
