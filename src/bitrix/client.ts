@@ -165,7 +165,8 @@ export class BitrixClient {
 
     for (const key of ["r", "c", "a", "u"]) {
       const entry = batchResult[key];
-      const tasks = ((entry?.result as { tasks?: BitrixRawTask[] })?.tasks ?? []) as BitrixRawTask[];
+      // Batch result per-command is the raw result object (no extra `result` wrapper)
+      const tasks = ((entry as unknown as { tasks?: BitrixRawTask[] })?.tasks ?? []) as BitrixRawTask[];
       for (const t of tasks) {
         if (!seen.has(t.id)) {
           seen.add(t.id);
