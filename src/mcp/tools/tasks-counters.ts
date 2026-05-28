@@ -62,8 +62,7 @@ export function registerTasksCounters(
         const result = await client.listTasks({
           userId: ctx.bitrixUserId,
           role: role ?? "any",
-          deadlineTo: new Date().toISOString(),
-          status: ["new", "pending", "in_progress", "deferred"],
+          overdueOnly: true,
           orderBy: "deadline",
           orderDir: "asc",
           page: 1,

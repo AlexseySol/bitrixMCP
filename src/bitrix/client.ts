@@ -258,6 +258,7 @@ export class BitrixClient {
 interface TaskListParams {
   userId: number;
   role?: string;
+  overdueOnly?: boolean;
   status?: string[];
   groupId?: number;
   deadlineFrom?: string;
@@ -343,7 +344,11 @@ function normalizeComment(c: BitrixRawComment): Comment {
 
 function buildFilter(p: TaskListParams): Record<string, unknown> {
   const f: Record<string, unknown> = {};
-  if (p.status?.length) f["STATUS"] = p.status.map((s) => TASK_STATUS_TO_CODE[s] ?? 3);
+  if (p.overdueOnly) {
+    f["STATUS"] = -2; // Bitrix24 native meta-status for overdue tasks
+  } else if (p.status?.length) {
+    f["STATUS"] = p.status.map((s) => TASK_STATUS_TO_CODE[s] ?? 3);
+  }
   if (p.groupId) f["GROUP_ID"] = p.groupId;
   if (p.deadlineFrom) f[">=DEADLINE"] = p.deadlineFrom;
   if (p.deadlineTo) f["<=DEADLINE"] = p.deadlineTo;
@@ -373,9 +378,17 @@ function roleToFilter(role: string, userId: number): Record<string, unknown> {
 }
 
 function filterToQueryString(filter: Record<string, unknown>): string {
-  return Object.entries(filter)
-    .map(([k, v]) => `filter[${encodeURIComponent(k)}]=${encodeURIComponent(String(v))}`)
-    .join("&");
+  const parts: string[] = [];
+  for (const [k, v] of Object.entries(filter)) {
+    if (Array.isArray(v)) {
+      // filter[STATUS][0]=1&filter[STATUS][1]=2 — Bitrix24 array format
+      v.forEach((item, i) => parts.push(`filter[${k}][${i}]=${encodeURIComponent(String(item))}`));
+    } else {
+      // Do NOT encode the key — operators like <=DEADLINE must stay literal
+      parts.push(`filter[${k}]=${encodeURIComponent(String(v))}`);
+    }
+  }
+  return parts.join("&");
 }
 
 function sortTasks(tasks: Task[], order: Record<string, string>): Task[] {
