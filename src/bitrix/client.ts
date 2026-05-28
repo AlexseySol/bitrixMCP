@@ -151,11 +151,12 @@ export class BitrixClient {
     const filterQs = filterToQueryString(filter);
     const selectQs = TASK_FIELDS.map((f) => `select[]=${f}`).join("&");
 
-    // Only responsible + creator — "my tasks" in the personal sense.
-    // Accomplice/auditor cover company-wide tasks (thousands) that belong to others.
+    // ACCOMPLICE / AUDITOR singular — plural form is ignored by Bitrix24 API
     const cmds: Record<string, string> = {
       r: `tasks.task.list?filter[RESPONSIBLE_ID]=${userId}&${filterQs}&${selectQs}&start=${start}`,
       c: `tasks.task.list?filter[CREATED_BY]=${userId}&${filterQs}&${selectQs}&start=${start}`,
+      a: `tasks.task.list?filter[ACCOMPLICE]=${userId}&${filterQs}&${selectQs}&start=${start}`,
+      u: `tasks.task.list?filter[AUDITOR]=${userId}&${filterQs}&${selectQs}&start=${start}`,
     };
 
     const batchResult = await this.batchCall(cmds);
@@ -163,7 +164,7 @@ export class BitrixClient {
     const seen = new Set<string>();
     const merged: Task[] = [];
 
-    for (const key of ["r", "c"]) {
+    for (const key of ["r", "c", "a", "u"]) {
       const entry = batchResult[key];
       const tasks = ((entry as unknown as { tasks?: BitrixRawTask[] })?.tasks ?? []) as BitrixRawTask[];
       for (const t of tasks) {
@@ -189,7 +190,7 @@ export class BitrixClient {
 
   async createTask(fields: Record<string, unknown>): Promise<{ task_id: number; task: Task }> {
     const raw = await this.call<{ task: BitrixRawTask }>("tasks.task.add", { fields });
-    const task = normalizeTask(raw.task, Number(raw.task.creator.id));
+    const task = normalizeTask(raw.task, Number(raw.task.creator?.id ?? raw.task.createdBy ?? 0));
     return { task_id: task.id, task };
   }
 
@@ -293,10 +294,15 @@ function normalizeUser(u: BitrixRawUser): User {
 }
 
 function normalizeTask(t: BitrixRawTask, currentUserId: number): Task {
-  const creatorId = Number(t.creator?.id ?? 0);
-  const responsibleId = Number(t.responsible?.id ?? 0);
-  const accompliceIds = (t.accomplices ?? []).map((a) => Number(a.id));
-  const auditorIds = (t.auditors ?? []).map((a) => Number(a.id));
+  // creator/responsible come as objects from CREATED_BY/RESPONSIBLE_ID select
+  const creatorId = Number(t.creator?.id ?? t.createdBy ?? 0);
+  const responsibleId = Number(t.responsible?.id ?? t.responsibleId ?? 0);
+
+  // accomplices/auditors: string[] of user IDs; *Data: dict keyed by ID for names
+  const accompliceIds = (t.accomplices ?? []).map(Number);
+  const auditorIds = (t.auditors ?? []).map(Number);
+  const accomplicesData = t.accomplicesData ?? {};
+  const auditorsData = t.auditorsData ?? {};
 
   const myRole: string[] = [];
   if (creatorId === currentUserId) myRole.push("creator");
@@ -304,7 +310,12 @@ function normalizeTask(t: BitrixRawTask, currentUserId: number): Task {
   if (accompliceIds.includes(currentUserId)) myRole.push("accomplice");
   if (auditorIds.includes(currentUserId)) myRole.push("auditor");
 
-  const priorityCode = Number(t.priority);
+  // group is [] (no group) or {id, name, ...} object
+  const rawGroup = t.group as { id?: string; name?: string } | undefined;
+  const group =
+    rawGroup && !Array.isArray(rawGroup) && rawGroup.id
+      ? { id: Number(rawGroup.id), name: rawGroup.name ?? "" }
+      : undefined;
 
   return {
     id: Number(t.id),
@@ -313,16 +324,22 @@ function normalizeTask(t: BitrixRawTask, currentUserId: number): Task {
     status: TASK_STATUS_BY_CODE[t.status] ?? "unknown",
     status_code: Number(t.status),
     priority: TASK_PRIORITY_BY_CODE[t.priority] ?? "normal",
-    priority_code: priorityCode,
+    priority_code: Number(t.priority),
     deadline: t.deadline || undefined,
     start_date_plan: t.startDatePlan || undefined,
     end_date_plan: t.endDatePlan || undefined,
     created_date: t.createdDate,
     creator: { id: creatorId, name: t.creator?.name ?? "" },
     responsible: { id: responsibleId, name: t.responsible?.name ?? "" },
-    accomplices: (t.accomplices ?? []).map((a) => ({ id: Number(a.id), name: a.name })),
-    auditors: (t.auditors ?? []).map((a) => ({ id: Number(a.id), name: a.name })),
-    group: t.group ? { id: Number(t.group.id), name: t.group.name } : undefined,
+    accomplices: accompliceIds.map((id) => ({
+      id,
+      name: accomplicesData[String(id)]?.name ?? "",
+    })),
+    auditors: auditorIds.map((id) => ({
+      id,
+      name: auditorsData[String(id)]?.name ?? "",
+    })),
+    group,
     parent_id: t.parentId ? Number(t.parentId) : undefined,
     tags: t.tags ?? [],
     my_role: myRole,
@@ -368,11 +385,12 @@ function buildOrder(orderBy?: string, orderDir?: string): Record<string, string>
 }
 
 function roleToFilter(role: string, userId: number): Record<string, unknown> {
+  // ACCOMPLICE / AUDITOR are singular per Bitrix24 docs — plural form is ignored by the API
   const map: Record<string, Record<string, unknown>> = {
     responsible: { RESPONSIBLE_ID: userId },
     creator: { CREATED_BY: userId },
-    accomplice: { ACCOMPLICES: [userId] },
-    auditor: { AUDITORS: [userId] },
+    accomplice: { ACCOMPLICE: userId },
+    auditor: { AUDITOR: userId },
   };
   return map[role] ?? {};
 }

@@ -23,16 +23,26 @@ export interface BitrixRawTask {
   description?: string;
   status: string;
   priority: string;
-  deadline?: string;
-  startDatePlan?: string;
-  endDatePlan?: string;
+  deadline?: string | null;
+  startDatePlan?: string | null;
+  endDatePlan?: string | null;
   createdDate: string;
-  creator: { id: string; name: string };
-  responsible: { id: string; name: string };
-  accomplices?: Array<{ id: string; name: string }>;
-  auditors?: Array<{ id: string; name: string }>;
-  group?: { id: string; name: string };
-  parentId?: string;
+  // CREATED_BY select returns createdBy (ID string) + creator (object)
+  createdBy?: string | number;
+  creator?: { id: string; name: string };
+  // RESPONSIBLE_ID select returns responsibleId (ID string) + responsible (object)
+  responsibleId?: string | number;
+  responsible?: { id: string; name: string };
+  // ACCOMPLICES select: accomplices = string[], accomplicesData = dict keyed by ID
+  accomplices?: string[];
+  accomplicesData?: Record<string, { id: string; name: string }>;
+  // AUDITORS select: auditors = string[], auditorsData = dict keyed by ID
+  auditors?: string[];
+  auditorsData?: Record<string, { id: string; name: string }>;
+  // GROUP_ID select: group is [] (no group) or {id, name, ...} object
+  group?: { id: string; name: string } | unknown[];
+  groupId?: string | number;
+  parentId?: string | null;
   tags?: string[];
 }
 
