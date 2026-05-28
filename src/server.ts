@@ -84,16 +84,30 @@ app.post("/authorize", authorizeRateLimit, authorizePost);
 // ---- Token exchange ----
 app.post("/token", tokenRateLimit, tokenHandler);
 
+// Required by MCP spec §Authorization: 401 must carry WWW-Authenticate so the client
+// can discover the OAuth protected resource metadata and start the auth flow.
+function rejectUnauthorized(res: Response, description: string): void {
+  res
+    .status(401)
+    .setHeader(
+      "WWW-Authenticate",
+      `Bearer resource_metadata="${config.BASE_URL}/.well-known/oauth-protected-resource"`,
+    )
+    .json({ error: "unauthorized", error_description: description });
+}
+
 // ---- MCP endpoint (Streamable HTTP transport) ----
 // Only GET (SSE), POST (requests), DELETE (session close) per MCP spec
 const mcpHandler = async (req: Request, res: Response): Promise<void> => {
+  logger.debug(
+    { method: req.method, headers: { accept: req.headers.accept, "content-type": req.headers["content-type"] } },
+    "MCP request received",
+  );
+
   const authHeader = req.headers.authorization;
 
   if (!authHeader?.startsWith("Bearer ")) {
-    res.status(401).json({
-      error: "unauthorized",
-      error_description: "Bearer token required. Connect this server via Claude.ai first.",
-    });
+    rejectUnauthorized(res, "Bearer token required. Connect this server via Claude.ai first.");
     return;
   }
 
@@ -103,10 +117,7 @@ const mcpHandler = async (req: Request, res: Response): Promise<void> => {
   try {
     ctx = decryptToken(rawToken);
   } catch {
-    res.status(401).json({
-      error: "invalid_token",
-      error_description: "Token is invalid or was encrypted with a different key",
-    });
+    rejectUnauthorized(res, "Token is invalid or was encrypted with a different key.");
     return;
   }
 
@@ -121,6 +132,14 @@ const mcpHandler = async (req: Request, res: Response): Promise<void> => {
 
   try {
     await mcpServer.connect(transport);
+
+    // Log the JSON-RPC method being called for easier debugging
+    const rpcMethod = (req.body as { method?: string } | undefined)?.method;
+    logger.info(
+      { domain: ctx.bitrixDomain, userId: ctx.bitrixUserId, rpcMethod },
+      "MCP call",
+    );
+
     await transport.handleRequest(req, res, req.body);
   } catch (err) {
     logger.error({ err, domain: ctx.bitrixDomain }, "MCP request failed");
